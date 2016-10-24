@@ -50,7 +50,7 @@
 #include <signal.h>
 
 typedef long long mstime_t; /* millisecond time type. */
-
+#include "art.h"
 #include "ae.h"      /* Event driven programming library */
 #include "sds.h"     /* Dynamic safe strings */
 #include "dict.h"    /* Hash tables */
@@ -541,6 +541,7 @@ typedef struct RedisModuleIO {
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
+#define OBJ_ENCODING_ART 10 //TODO : Provide a descriptive comment
 
 #define LRU_BITS 24
 #define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */
@@ -738,6 +739,7 @@ typedef struct zskiplist {
 typedef struct zset {
     dict *dict;
     zskiplist *zsl;
+    art_tree  *zart;
 } zset;
 
 typedef struct clientBufferLimitsConfig {

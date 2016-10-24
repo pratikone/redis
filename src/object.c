@@ -221,7 +221,8 @@ robj *createZsetObject(void) {
     zs->dict = dictCreate(&zsetDictType,NULL);
     zs->zsl = zslCreate();
     o = createObject(OBJ_ZSET,zs);
-    o->encoding = OBJ_ENCODING_SKIPLIST;
+//    o->encoding = OBJ_ENCODING_SKIPLIST;
+    o->encoding = OBJ_ENCODING_ART;
     return o;
 }
 

@@ -186,6 +186,34 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
     return x;
 }
 
+void *zartInsert(art_tree *zart, double score, sds ele) {
+
+    if( zart == NULL ){
+        art_tree t;
+        zart = &t;
+        int res = art_tree_init(zart);
+        if(res){
+            printf("error and exit %d\n", __LINE__);
+            return -1;
+        }
+
+        char key_str[100];    //TODO : again scoring limitation
+
+        sprintf(key_str, "%d", score);
+//        char *key = itoa(score);            // TODO : handle negative score
+       int len = strlen(key_str);
+       return art_insert(zart, key_str, len, ele);
+    }
+
+
+
+
+
+
+}
+
+
+
 /* Internal function used by zslDelete, zslDeleteByScore and zslDeleteByRank */
 void zslDeleteNode(zskiplist *zsl, zskiplistNode *x, zskiplistNode **update) {
     int i;
@@ -1318,6 +1346,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
     } else if (zobj->encoding == OBJ_ENCODING_SKIPLIST) {
         zset *zs = zobj->ptr;
         zskiplistNode *znode;
+        void *art_node;
         dictEntry *de;
 
         de = dictFind(zs->dict,ele);
@@ -1366,7 +1395,15 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             *flags |= ZADD_NOP;
             return 1;
         }
-    } else {
+    }else if (zobj->encoding == OBJ_ENCODING_ART) {
+        zset *zs = zobj->ptr;
+        ele = sdsdup(ele);
+        art_node *znode= zartInsert(zs->zart, score, ele);
+        serverLog(LL_NOTICE, "working here");
+        *flags |= ZADD_ADDED;
+        return 1;
+    }
+    else {
         serverPanic("Unknown sorted set encoding");
     }
     return 0; /* Never reached. */
