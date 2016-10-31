@@ -5,6 +5,10 @@
 #include <emmintrin.h>
 #include <assert.h>
 #include "art.h"
+#include "zmalloc.h"
+
+extern void serverLog(int level, const char *fmt, ...);
+
 
 /**
  * Macros to manipulate pointer tags
@@ -21,16 +25,16 @@ static art_node* alloc_node(uint8_t type) {
     art_node* n;
     switch (type) {
         case NODE4:
-            n = (art_node*)calloc(1, sizeof(art_node4));
+            n = (art_node*)zcalloc(sizeof(art_node4));
             break;
         case NODE16:
-            n = (art_node*)calloc(1, sizeof(art_node16));
+            n = (art_node*)zcalloc(sizeof(art_node16));
             break;
         case NODE48:
-            n = (art_node*)calloc(1, sizeof(art_node48));
+            n = (art_node*)zcalloc(sizeof(art_node48));
             break;
         case NODE256:
-            n = (art_node*)calloc(1, sizeof(art_node256));
+            n = (art_node*)zcalloc(sizeof(art_node256));
             break;
         default:
             abort();
@@ -56,7 +60,7 @@ static void destroy_node(art_node *n) {
 
     // Special case leafs
     if (IS_LEAF(n)) {
-        free(LEAF_RAW(n));
+        zfree(LEAF_RAW(n));
         return;
     }
 
@@ -102,8 +106,8 @@ static void destroy_node(art_node *n) {
             abort();
     }
 
-    // Free ourself on the way up
-    free(n);
+    // zfree ourself on the way up
+    zfree(n);
 }
 
 /**
@@ -320,7 +324,7 @@ art_leaf* art_maximum(art_tree *t) {
 }
 
 static art_leaf* make_leaf(const unsigned char *key, int key_len, void *value) {
-    art_leaf *l = (art_leaf*)malloc(sizeof(art_leaf)+key_len);
+    art_leaf *l = (art_leaf*)zmalloc(sizeof(art_leaf)+key_len);
     l->value = value;
     l->key_len = key_len;
     memcpy(l->key, key, key_len);
@@ -365,7 +369,7 @@ static void add_child48(art_node48 *n, art_node **ref, unsigned char c, void *ch
         }
         copy_header((art_node*)new_node, (art_node*)n);
         *ref = (art_node*)new_node;
-        free(n);
+        zfree(n);
         add_child256(new_node, ref, c, child);
     }
 }
@@ -408,7 +412,7 @@ static void add_child16(art_node16 *n, art_node **ref, unsigned char c, void *ch
         }
         copy_header((art_node*)new_node, (art_node*)n);
         *ref = (art_node*)new_node;
-        free(n);
+        zfree(n);
         add_child48(new_node, ref, c, child);
     }
 }
@@ -440,7 +444,7 @@ static void add_child4(art_node4 *n, art_node **ref, unsigned char c, void *chil
                 sizeof(unsigned char)*n->n.num_children);
         copy_header((art_node*)new_node, (art_node*)n);
         *ref = (art_node*)new_node;
-        free(n);
+        zfree(n);
         add_child16(new_node, ref, c, child);
     }
 }
@@ -488,6 +492,7 @@ static void* recursive_insert(art_node *n, art_node **ref, const unsigned char *
     // If we are at a NULL node, inject a leaf
     if (!n) {
         *ref = (art_node*)SET_LEAF(make_leaf(key, key_len, value));
+        serverLog(2, "pointer : %p", *ref);
         return NULL;
     }
 
@@ -579,7 +584,6 @@ RECURSE_SEARCH:;
  * the old value pointer is returned.
  */
 void* art_insert(art_tree *t, const unsigned char *key, int key_len, void *value) {
-    printf("%s : %d\n", key, (int)value);
     int old_val = 0;
     void *old = recursive_insert(t->root, &t->root, key, key_len, value, 0, &old_val);
     if (!old_val) t->size++;
@@ -605,7 +609,7 @@ static void remove_child256(art_node256 *n, art_node **ref, unsigned char c) {
                 pos++;
             }
         }
-        free(n);
+        zfree(n);
     }
 }
 
@@ -629,7 +633,7 @@ static void remove_child48(art_node48 *n, art_node **ref, unsigned char c) {
                 child++;
             }
         }
-        free(n);
+        zfree(n);
     }
 }
 
@@ -645,7 +649,7 @@ static void remove_child16(art_node16 *n, art_node **ref, art_node **l) {
         copy_header((art_node*)new_node, (art_node*)n);
         memcpy(new_node->keys, n->keys, 4);
         memcpy(new_node->children, n->children, 4*sizeof(void*));
-        free(n);
+        zfree(n);
     }
 }
 
@@ -676,7 +680,7 @@ static void remove_child4(art_node4 *n, art_node **ref, art_node **l) {
             child->partial_len += n->n.partial_len + 1;
         }
         *ref = child;
-        free(n);
+        zfree(n);
     }
 }
 
@@ -697,7 +701,12 @@ static void remove_child(art_node *n, art_node **ref, unsigned char c, art_node 
 
 static art_leaf* recursive_delete(art_node *n, art_node **ref, const unsigned char *key, int key_len, int depth) {
     // Search terminated
-    if (!n) return NULL;
+    if (!n) {
+        serverLog(2, "null ?");
+        return NULL;
+    }
+
+    serverLog(2, "pointer : %p", n);
 
     // Handle hitting a leaf node
     if (IS_LEAF(n)) {
@@ -746,11 +755,12 @@ static art_leaf* recursive_delete(art_node *n, art_node **ref, const unsigned ch
  * the value pointer is returned.
  */
 void* art_delete(art_tree *t, const unsigned char *key, int key_len) {
+
     art_leaf *l = recursive_delete(t->root, &t->root, key, key_len, 0);
     if (l) {
         t->size--;
         void *old = l->value;
-        free(l);
+        zfree(l);
         return old;
     }
     return NULL;

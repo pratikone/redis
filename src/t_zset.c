@@ -188,29 +188,49 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
 
 void *zartInsert(art_tree *zart, double score, sds ele) {
 
-    if( zart == NULL ){
-        art_tree t;
-        zart = &t;
-        int res = art_tree_init(zart);
-        if(res){
-            printf("error and exit %d\n", __LINE__);
-            return -1;
-        }
+    char *key_str;
 
+    key_str = zmalloc(20*sizeof(char));  //TODO : reduce this if necesaary
+
+    sprintf(key_str, "%d\0", (int)score);
+//        char *key = itoa(score);            // TODO : handle negative score
+   int len = strlen(key_str);
+   sds ele_copy = zmalloc(sizeof(ele));
+   memcpy(ele_copy, ele, sizeof(ele));
+   serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+   return art_insert(zart, key_str, len, ele_copy);
+
+    return 0;
+}
+
+
+unsigned long zartRemove(art_tree *zart, double score) {
+
+    if( zart != NULL ){
+
+        serverLog(2, "pointer : %p", zart->root);
         char key_str[100];    //TODO : again scoring limitation
 
-        sprintf(key_str, "%d", score);
+        sprintf(key_str, "%d\0", (int)score);
 //        char *key = itoa(score);            // TODO : handle negative score
        int len = strlen(key_str);
-       return art_insert(zart, key_str, len, ele);
+       serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+       sds value = art_delete(zart, key_str, len );
+       zfree(value);
+       return 1; //TODO : change it to count
+    }
+    else{
+        serverLog(LL_NOTICE, "yo");
     }
 
 
 
-
-
-
+    return 0;
 }
+
+
+
+
 
 
 
@@ -1398,9 +1418,12 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
     }else if (zobj->encoding == OBJ_ENCODING_ART) {
         zset *zs = zobj->ptr;
         ele = sdsdup(ele);
+        serverLog(LL_NOTICE, "value  : %s", ele);
         art_node *znode= zartInsert(zs->zart, score, ele);
         serverLog(LL_NOTICE, "working here");
+        serverLog(2, "zart root pointer : %p", zs->zart->root);
         *flags |= ZADD_ADDED;
+        if (newscore) *newscore = score;
         return 1;
     }
     else {
@@ -1640,6 +1663,7 @@ cleanup:
         notifyKeyspaceEvent(NOTIFY_ZSET,
             incr ? "zincr" : "zadd", key, c->db->id);
     }
+
 }
 
 void zaddCommand(client *c) {
@@ -1762,7 +1786,24 @@ void zremrangeGenericCommand(client *c, int rangetype) {
             dbDelete(c->db,key);
             keyremoved = 1;
         }
-    } else {
+    } else if (zobj->encoding == OBJ_ENCODING_ART) {
+
+        zset *zs = zobj->ptr;
+        serverLog(2, "zart root pointer : %p", zs->zart->root);
+        switch(rangetype) {
+        case ZRANGE_RANK:
+            deleted = zslDeleteRangeByRank(zs->zsl,start+1,end+1,zs->dict);
+            break;
+        case ZRANGE_SCORE:
+            deleted = zartRemove(zs->zart, range.max);   //TODO : change it to double
+            break;
+        case ZRANGE_LEX:
+            deleted = zslDeleteRangeByLex(zs->zsl,&lexrange,zs->dict);
+            break;
+        }
+
+    }
+    else{
         serverPanic("Unknown sorted set encoding");
     }
 

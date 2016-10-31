@@ -350,7 +350,7 @@ int selectDb(client *c, int id) {
  *----------------------------------------------------------------------------*/
 
 void signalModifiedKey(redisDb *db, robj *key) {
-    touchWatchedKey(db,key);
+    touchWatchedKey(db,key);   //TODO : figure out crash reason
 }
 
 void signalFlushedDb(int dbid) {

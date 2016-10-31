@@ -215,11 +215,17 @@ robj *createHashObject(void) {
 }
 
 robj *createZsetObject(void) {
+
     zset *zs = zmalloc(sizeof(*zs));
     robj *o;
 
     zs->dict = dictCreate(&zsetDictType,NULL);
     zs->zsl = zslCreate();
+
+    art_tree t;
+    int res = art_tree_init(&t);
+
+    zs->zart = &t;
     o = createObject(OBJ_ZSET,zs);
 //    o->encoding = OBJ_ENCODING_SKIPLIST;
     o->encoding = OBJ_ENCODING_ART;
