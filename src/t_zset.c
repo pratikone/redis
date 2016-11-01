@@ -216,7 +216,9 @@ unsigned long zartRemove(art_tree *zart, double score) {
        int len = strlen(key_str);
        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
        sds value = art_delete(zart, key_str, len );
-       zfree(value);
+       serverLog(LL_NOTICE, "deleting %s", value);
+       sdsfree(value);
+//       zfree(value);
        return 1; //TODO : change it to count
     }
     else{
@@ -1639,6 +1641,7 @@ void zaddGenericCommand(client *c, int flags) {
             addReplyError(c,nanerr);
             goto cleanup;
         }
+
         if (retflags & ZADD_ADDED) added++;
         if (retflags & ZADD_UPDATED) updated++;
         if (!(retflags & ZADD_NOP)) processed++;

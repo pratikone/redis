@@ -222,10 +222,11 @@ robj *createZsetObject(void) {
     zs->dict = dictCreate(&zsetDictType,NULL);
     zs->zsl = zslCreate();
 
-    art_tree t;
-    int res = art_tree_init(&t);
+    art_tree *t = zmalloc(sizeof(art_tree));
 
-    zs->zart = &t;
+    int res = art_tree_init(t); //TODO : server panic if this doesn't work
+
+    zs->zart = t;
     o = createObject(OBJ_ZSET,zs);
 //    o->encoding = OBJ_ENCODING_SKIPLIST;
     o->encoding = OBJ_ENCODING_ART;
