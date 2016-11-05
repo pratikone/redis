@@ -216,6 +216,7 @@ robj *createHashObject(void) {
 
 robj *createZsetObject(void) {
 
+    serverLog(LL_NOTICE, "yeahhhhhhhh, creating zset");
     zset *zs = zmalloc(sizeof(*zs));
     robj *o;
 
