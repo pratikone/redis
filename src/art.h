@@ -24,7 +24,7 @@ extern "C" {
 # endif
 #endif
 
-typedef int(*art_callback)(void *data, const unsigned char *key, uint32_t key_len, void *value);
+typedef int(*art_callback)(void **data, const unsigned char *key, uint32_t key_len, void *value);
 
 /**
  * This struct is included as part
@@ -181,7 +181,7 @@ art_leaf* art_maximum(art_tree *t);
  * @arg data Opaque handle passed to the callback
  * @return 0 on success, or the return of the callback.
  */
-int art_iter(art_tree *t, art_callback cb, void *data);
+int art_iter(art_tree *t, art_callback cb, void **data);
 
 /**
  * Iterates through the entries pairs in the map,
@@ -196,6 +196,11 @@ int art_iter(art_tree *t, art_callback cb, void *data);
  * @return 0 on success, or the return of the callback.
  */
 int art_iter_prefix(art_tree *t, const unsigned char *prefix, int prefix_len, art_callback cb, void *data);
+
+int iter_delete(void **data, const unsigned char* key, uint32_t key_len, void *val);
+//function to be called on iter
+int iter_cb(void *data, const unsigned char* key, uint32_t key_len, void *val);
+
 
 #ifdef __cplusplus
 }

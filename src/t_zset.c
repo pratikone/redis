@@ -1513,7 +1513,17 @@ int zsetDel(robj *zobj, sds ele) {
                 dictResize(zs->dict);
             return 1;
         }
-    } else {
+    }
+    else if (zobj->encoding == OBJ_ENCODING_ART) {
+        zset *zs = zobj->ptr;
+
+        art_delete_by_value(zs->zart, ele);
+        int a = 10;
+        serverLog(LL_NOTICE, "%djnkjnjnjknjnkk", a);
+        return 1;
+
+
+    }else {
         serverPanic("Unknown sorted set encoding");
     }
     return 0; /* No such element found. */
@@ -1865,7 +1875,7 @@ void zremrangeGenericCommand(client *c, int rangetype) {
         case ZRANGE_SCORE:
 
             for (int i = range.min; i <= range.max; i++)
-                deleted += zartRemove(zs->zart, i);     //TODO : not handling range remove of decimal numbers
+                deleted += zartRemove(zs->zart, i);     //TODO : not handling range remove of decimal numbers as it will require different approach
             break;
         case ZRANGE_LEX:
             deleted = zslDeleteRangeByLex(zs->zsl, &lexrange, zs->dict);

@@ -766,9 +766,44 @@ void* art_delete(art_tree *t, const unsigned char *key, int key_len) {
     return NULL;
 }
 
+
+
+
+
+int art_delete_by_value(art_tree *t, void *value) {
+    serverLog(2, "Entering to delete");
+
+    void *out[2];
+    out[0] = t;
+    out[1] = value;
+    if(art_iter(t, iter_delete, out) == 1){
+        //success
+        serverLog(2, "Success in removal of value");
+        serverLog(2, "removeeeeeeeeeeeeeeeee %s", out[1]);
+        sdsfree(out[1]);
+        return 0;
+    }
+    else{
+        serverLog(2, "Value not found");
+    }
+
+
+    return -1;
+
+}
+
+
+
+
+
+
+
+
 // Recursively iterates over the tree
-static int recursive_iter(art_node *n, art_callback cb, void *data) {
+static int recursive_iter(art_node *n, art_callback cb, void **data) {
     // Handle base cases
+    serverLog(2, "recursive call");
+    serverLog(2, "recursive_iter pointer : %p", n);
     if (!n) return 0;
     if (IS_LEAF(n)) {
         art_leaf *l = LEAF_RAW(n);
@@ -810,7 +845,8 @@ static int recursive_iter(art_node *n, art_callback cb, void *data) {
             break;
 
         default:
-            abort();
+            serverLog(3, "Error occurred recursive call");
+            //abort();
     }
     return 0;
 }
@@ -825,7 +861,7 @@ static int recursive_iter(art_node *n, art_callback cb, void *data) {
  * @arg data Opaque handle passed to the callback
  * @return 0 on success, or the return of the callback.
  */
-int art_iter(art_tree *t, art_callback cb, void *data) {
+int art_iter(art_tree *t, art_callback cb, void **data) {
     return recursive_iter(t->root, cb, data);
 }
 
@@ -906,3 +942,33 @@ int art_iter_prefix(art_tree *t, const unsigned char *key, int key_len, art_call
     }
     return 0;
 }
+
+
+int iter_delete(void **data, const unsigned char* key, uint32_t key_len, void *val) {
+    serverLog(2, "iter_delete getting called");
+    art_tree *t = (art_tree *)data[0];
+    char *value_to_remove = (char*)data[1];
+    char *node_val = (char*)val;
+
+    serverLog(2, "%s remove ", value_to_remove);
+    serverLog(2, "%s node_val ", node_val);
+    if(strcmp(value_to_remove, node_val) == 0){
+        serverLog(2, "iter_delete FOUND ");
+        data[1] = art_delete(t, key, key_len);
+        return 1;
+    }
+    return 0;
+}
+
+
+
+
+int iter_cb(void *data, const unsigned char* key, uint32_t key_len, void *val) {
+    uint64_t *out = (uint64_t*)data;
+    uintptr_t line = (uintptr_t)val;
+    uint64_t mask = (line * (key[0] + key_len));
+    out[0]++;
+    out[1] ^= mask;
+    return 0;
+}
+
