@@ -1190,7 +1190,10 @@ unsigned int zsetLength(const robj *zobj) {
         length = zzlLength(zobj->ptr);
     } else if (zobj->encoding == OBJ_ENCODING_SKIPLIST) {
         length = ((const zset*) zobj->ptr)->zsl->length;
-    } else {
+    }else if (zobj->encoding == OBJ_ENCODING_ART) {
+        length = ((const zset*) zobj->ptr)->zart->size;
+    }
+    else {
         serverPanic("Unknown sorted set encoding");
     }
     return length;
@@ -1516,10 +1519,7 @@ int zsetDel(robj *zobj, sds ele) {
     }
     else if (zobj->encoding == OBJ_ENCODING_ART) {
         zset *zs = zobj->ptr;
-
         art_delete_by_value(zs->zart, ele);
-        int a = 10;
-        serverLog(LL_NOTICE, "%djnkjnjnjknjnkk", a);
         return 1;
 
 
