@@ -200,7 +200,9 @@ void *zartInsert(art_tree *zart, double score, sds ele) {
     int len = strlen(key_str);
     sds ele_copy = zmalloc(sizeof(ele));
     memcpy(ele_copy, ele, sizeof(ele));
-    serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+
+//    serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+
     return art_insert(zart, key_str, len, ele_copy);
 
     zfree(key_str_orig);
@@ -213,16 +215,18 @@ unsigned long zartRemove(art_tree *zart, double score) {
 
     if (zart != NULL) {
 
-        serverLog(2, "pointer : %p", zart->root);
+//        serverLog(2, "pointer : %p", zart->root);
         char *key_str;
 
         key_str = zmalloc(20 * sizeof(char));
 
         sprintf(key_str, "%d\0", (int) score);
         int len = strlen(key_str);
-        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+//        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
         sds value = art_delete(zart, key_str, len);
-        serverLog(LL_NOTICE, "deleting %s", value);
+
+//        serverLog(LL_NOTICE, "deleting %s", value);
+
         sdsfree(value);
         zfree(key_str); //key gets copied anyways
         return 1; //TODO : change it to count
@@ -1467,10 +1471,10 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
     } else if (zobj->encoding == OBJ_ENCODING_ART) {
         zset *zs = zobj->ptr;
         ele = sdsdup(ele);
-        serverLog(LL_NOTICE, "value  : %s", ele);
+//        serverLog(LL_NOTICE, "value  : %s", ele);
         art_node *znode = zartInsert(zs->zart, score, ele);
-        serverLog(LL_NOTICE, "working here");
-        serverLog(2, "zart root pointer : %p", zs->zart->root);
+//        serverLog(LL_NOTICE, "working here");
+//        serverLog(2, "zart root pointer : %p", zs->zart->root);
         *flags |= ZADD_ADDED;
         if (newscore)
             *newscore = score;
@@ -1866,7 +1870,7 @@ void zremrangeGenericCommand(client *c, int rangetype) {
     } else if (zobj->encoding == OBJ_ENCODING_ART) {
 
         zset *zs = zobj->ptr;
-        serverLog(2, "zart root pointer : %p", zs->zart->root);
+//        serverLog(2, "zart root pointer : %p", zs->zart->root);
         switch (rangetype) {
         case ZRANGE_RANK:
             deleted = zslDeleteRangeByRank(zs->zsl, start + 1, end + 1,

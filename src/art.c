@@ -492,7 +492,7 @@ static void* recursive_insert(art_node *n, art_node **ref, const unsigned char *
     // If we are at a NULL node, inject a leaf
     if (!n) {
         *ref = (art_node*)SET_LEAF(make_leaf(key, key_len, value));
-        serverLog(2, "pointer : %p", *ref);
+//        serverLog(2, "pointer : %p", *ref);
         return NULL;
     }
 
@@ -702,11 +702,11 @@ static void remove_child(art_node *n, art_node **ref, unsigned char c, art_node 
 static art_leaf* recursive_delete(art_node *n, art_node **ref, const unsigned char *key, int key_len, int depth) {
     // Search terminated
     if (!n) {
-        serverLog(2, "null ?");
+//        serverLog(2, "null ?");
         return NULL;
     }
 
-    serverLog(2, "pointer : %p", n);
+//    serverLog(2, "pointer : %p", n);
 
     // Handle hitting a leaf node
     if (IS_LEAF(n)) {
@@ -771,15 +771,13 @@ void* art_delete(art_tree *t, const unsigned char *key, int key_len) {
 
 
 int art_delete_by_value(art_tree *t, void *value) {
-    serverLog(2, "Entering to delete");
+//    serverLog(2, "Entering to delete");
 
     void *out[2];
     out[0] = t;
     out[1] = value;
     if(art_iter(t, iter_delete, out) == 1){
         //success
-        serverLog(2, "Success in removal of value");
-        serverLog(2, "removeeeeeeeeeeeeeeeee %s", out[1]);
         sdsfree(out[1]);
         return 0;
     }
@@ -802,8 +800,7 @@ int art_delete_by_value(art_tree *t, void *value) {
 // Recursively iterates over the tree
 static int recursive_iter(art_node *n, art_callback cb, void **data) {
     // Handle base cases
-    serverLog(2, "recursive call");
-    serverLog(2, "recursive_iter pointer : %p", n);
+//    serverLog(2, "recursive_iter pointer : %p", n);
     if (!n) return 0;
     if (IS_LEAF(n)) {
         art_leaf *l = LEAF_RAW(n);
@@ -945,15 +942,15 @@ int art_iter_prefix(art_tree *t, const unsigned char *key, int key_len, art_call
 
 
 int iter_delete(void **data, const unsigned char* key, uint32_t key_len, void *val) {
-    serverLog(2, "iter_delete getting called");
+//    serverLog(2, "iter_delete getting called");
     art_tree *t = (art_tree *)data[0];
     char *value_to_remove = (char*)data[1];
     char *node_val = (char*)val;
 
-    serverLog(2, "%s remove ", value_to_remove);
-    serverLog(2, "%s node_val ", node_val);
+//    serverLog(2, "%s remove ", value_to_remove);
+//    serverLog(2, "%s node_val ", node_val);
     if(strcmp(value_to_remove, node_val) == 0){
-        serverLog(2, "iter_delete FOUND ");
+//        serverLog(2, "iter_delete FOUND ");
         data[1] = art_delete(t, key, key_len);
         return 1;
     }
