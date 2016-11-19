@@ -2,6 +2,7 @@
 
 import psutil, sys, getopt
 
+# yue: use psutil to fetch process mem info
 def fetch_rss(proc_name):
 	for proc in psutil.process_iter():
 		#pinfo = proc.as_dict(attrs=['pid', 'name'])
