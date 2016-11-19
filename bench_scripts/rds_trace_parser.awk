@@ -1,5 +1,6 @@
 #!/usr/bin/awk -f
 
+# yue: a simple redis-cli dumped trace parser to calculate raw data size
 BEGIN {
 	num_records = 0
 	total_key_sz = 0
