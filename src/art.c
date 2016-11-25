@@ -257,6 +257,56 @@ void* art_search(const art_tree *t, const unsigned char *key, int key_len) {
     return NULL;
 }
 
+
+
+/**
+ * Searches for a node in the ART tree
+ * @arg t The tree
+ * @arg key The key
+ * @arg key_len The length of the key
+ * @return NULL if the item was not found, otherwise
+ * the value pointer is returned.
+ */
+art_node* art_search_node(const art_tree *t, const unsigned char *key, int key_len) {
+    art_node **child;
+    art_node *n = t->root;
+    int prefix_len, depth = 0;
+    while (n) {
+        // Might be a leaf
+        if (IS_LEAF(n)) {
+            n = (art_node*)LEAF_RAW(n);
+            // Check if the expanded path matches
+            if (!leaf_matches((art_leaf*)n, key, key_len, depth)) {
+                return n;
+            }
+            return NULL;
+        }
+
+        // Bail if the prefix does not match
+        if (n->partial_len) {
+            prefix_len = check_prefix(n, key, key_len, depth);
+            if (prefix_len != min(MAX_PREFIX_LEN, n->partial_len))
+                return NULL;
+            depth = depth + n->partial_len;
+        }
+
+        // Recursively search
+        child = find_child(n, key[depth]);
+        n = (child) ? *child : NULL;
+        depth++;
+    }
+    return NULL;
+}
+
+
+
+
+
+
+
+
+
+
 // Find the minimum leaf under a node
 static art_leaf* minimum(const art_node *n) {
     // Handle base cases
@@ -791,6 +841,33 @@ int art_delete_by_value(art_tree *t, void *value) {
 }
 
 
+int art_delete_by_range(art_tree *t, char* min_range, char* max_range) {
+//    serverLog(2, "Entering to delete");
+
+    void *out[2];
+    out[0] = t;
+    out[1] = min_range;
+    out[2] = max_range;
+
+
+    if(art_iter(t, iter_delete_range, out) == 1){
+        //success
+
+        return 0;
+    }
+    else{
+        serverLog(2, "Value not found");
+    }
+
+
+    return -1;
+
+}
+
+
+
+
+
 
 
 
@@ -956,6 +1033,26 @@ int iter_delete(void **data, const unsigned char* key, uint32_t key_len, void *v
     }
     return 0;
 }
+
+/*
+ * Can be optimized even more
+ */
+int iter_delete_range(void **data, const unsigned char* key, uint32_t key_len, void *val) {
+    art_tree *t = (art_tree *)data[0];
+    char *min_range = (char*)data[1];
+    char *max_range = (char*)data[2];
+    char *node_val = (char*)val;
+
+    //TODO Find API to convert char * to double
+
+    if( (atof( min_range ) <= atof(key)) && (atof( max_range ) >= atof(key)) ){
+        char *value = art_delete(t, key, key_len);
+        zfree(value);
+//        return 1;   //no return as we want to to traverse the whole subtree
+    }
+    return 0;
+}
+
 
 
 

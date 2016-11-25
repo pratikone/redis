@@ -187,17 +187,10 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
 
 void *zartInsert(art_tree *zart, double score, sds ele) {
 
-    char *key_str_orig, *key_str;
 
-    key_str_orig = zmalloc(20 * sizeof(char)); //used this trick to find number of digits in the number including decimal
+    char *key_str = NULL;
+    int len = zartKeyToString(score, key_str); // key gets allocated inside the function
 
-    sprintf(key_str_orig, "%d\0", score);
-
-    key_str = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
-
-    sprintf(key_str, "%d\0", score);
-
-    int len = strlen(key_str);
     sds ele_copy = zmalloc(sizeof(ele));
     memcpy(ele_copy, ele, sizeof(ele));
 
@@ -205,7 +198,6 @@ void *zartInsert(art_tree *zart, double score, sds ele) {
 
     return art_insert(zart, key_str, len, ele_copy);
 
-    zfree(key_str_orig);
     zfree(key_str); //key gets copied anyways
 
     return 0;
@@ -215,13 +207,8 @@ unsigned long zartRemove(art_tree *zart, double score) {
 
     if (zart != NULL) {
 
-//        serverLog(2, "pointer : %p", zart->root);
-        char *key_str;
-
-        key_str = zmalloc(20 * sizeof(char));
-
-        sprintf(key_str, "%d\0", (int) score);
-        int len = strlen(key_str);
+        char *key_str = NULL;
+        int len = zartKeyToString(score, key_str); // key gets allocated inside the function
 //        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
         sds value = art_delete(zart, key_str, len);
 
@@ -236,6 +223,25 @@ unsigned long zartRemove(art_tree *zart, double score) {
 
     return 0;
 }
+
+
+size_t zartKeyToString( double key, char* returningStr ){
+
+    char *key_str_orig;
+
+    key_str_orig = zmalloc(100 * sizeof(char)); //used this trick to find number of digits in the number including decimal
+
+    sprintf(key_str_orig, "%d\0", key);
+
+    returningStr = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
+
+    sprintf(returningStr, "%d\0", key);
+
+    zfree(key_str_orig);
+
+    return strlen(returningStr);
+}
+
 
 /* Internal function used by zslDelete, zslDeleteByScore and zslDeleteByRank */
 void zslDeleteNode(zskiplist *zsl, zskiplistNode *x, zskiplistNode **update) {
@@ -1878,8 +1884,50 @@ void zremrangeGenericCommand(client *c, int rangetype) {
             break;
         case ZRANGE_SCORE:
 
+            char *key_str_min = NULL, *key_str_max = NULL;
+            int len_min = zartKeyToString(range.min, key_str_min); // key gets allocated inside the function
+            int len_max = zartKeyToString(range.max, key_str_max); // key gets allocated inside the function
+
+
+            //if two rnages are 100.12 and 109.15 then the common string is 10
+            int min = len_min >len_max ? len_min : len_max;
+            char *commonStr = zmalloc((min + 1) * sizeof(char));
+            int i=0;
+            for(i=0; i<min; i++ ){
+                if( key_str_min[i] == key_str_max[i] )
+                    commonStr[i] = key_str_min[i];
+                else
+                    break;
+            }
+            commonStr[i] = '\0';
+
+            art_node *node = art_search_node(zs->zart, commonStr, strlen(commonStr));
+            if( node != NULL ){
+                art_tree t;
+                art_tree_init(&t);
+                t.root = node;
+                art_delete_by_range(t, key_str_min, key_str_max)
+
+
+
+            }
+            else{
+
+            }
+
+
+
+
+
+            /*
             for (int i = range.min; i <= range.max; i++)
                 deleted += zartRemove(zs->zart, i);     //TODO : not handling range remove of decimal numbers as it will require different approach
+
+            */
+
+            zfree(key_str_min);
+            zfree(key_str_max);
+
             break;
         case ZRANGE_LEX:
             deleted = zslDeleteRangeByLex(zs->zsl, &lexrange, zs->dict);
