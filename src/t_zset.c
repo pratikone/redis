@@ -65,6 +65,7 @@
 
 int zslLexValueGteMin(sds value, zlexrangespec *spec);
 int zslLexValueLteMax(sds value, zlexrangespec *spec);
+size_t zartKeyToString( double key, sds *returningStr );
 
 /* Create a skiplist node with the specified number of levels.
  * The SDS string 'ele' is referenced by the node after the call. */
@@ -188,13 +189,13 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
 void *zartInsert(art_tree *zart, double score, sds ele) {
 
 
-    char *key_str = NULL;
-    int len = zartKeyToString(score, key_str); // key gets allocated inside the function
+    sds key_str = NULL;
+    int len = zartKeyToString(score, &key_str); // key gets allocated inside the function
 
     sds ele_copy = zmalloc(sizeof(ele));
     memcpy(ele_copy, ele, sizeof(ele));
 
-//    serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
+    serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
 
     return art_insert(zart, key_str, len, ele_copy);
 
@@ -208,7 +209,7 @@ unsigned long zartRemove(art_tree *zart, double score) {
     if (zart != NULL) {
 
         char *key_str = NULL;
-        int len = zartKeyToString(score, key_str); // key gets allocated inside the function
+        int len = zartKeyToString(score, &key_str); // key gets allocated inside the function
 //        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
         sds value = art_delete(zart, key_str, len);
 
@@ -225,21 +226,25 @@ unsigned long zartRemove(art_tree *zart, double score) {
 }
 
 
-size_t zartKeyToString( double key, char* returningStr ){
+size_t zartKeyToString( double key, sds *returningStr ){
 
-    char *key_str_orig;
+    sds key_str_orig;
 
     key_str_orig = zmalloc(100 * sizeof(char)); //used this trick to find number of digits in the number including decimal
 
-    sprintf(key_str_orig, "%d\0", key);
+    sprintf(key_str_orig, "%f\0", key);
 
-    returningStr = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
+    *returningStr = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
 
-    sprintf(returningStr, "%d\0", key);
+
+    sprintf(*returningStr, "%f\0", key);
+
+//    serverLog(LL_NOTICE, "orig %s returning %s", key_str_orig, *returningStr);
+
 
     zfree(key_str_orig);
 
-    return strlen(returningStr);
+    return strlen(*returningStr);
 }
 
 
@@ -1792,6 +1797,8 @@ void zremrangeGenericCommand(client *c, int rangetype) {
     zrangespec range;
     zlexrangespec lexrange;
     long start, end, llen;
+    sds key_str_min = NULL, key_str_max =NULL;
+    int len_min, len_max;
 
     /* Step 1: Parse the range. */
     if (rangetype == ZRANGE_RANK) {
@@ -1884,14 +1891,14 @@ void zremrangeGenericCommand(client *c, int rangetype) {
             break;
         case ZRANGE_SCORE:
 
-            char *key_str_min = NULL, *key_str_max = NULL;
-            int len_min = zartKeyToString(range.min, key_str_min); // key gets allocated inside the function
-            int len_max = zartKeyToString(range.max, key_str_max); // key gets allocated inside the function
+
+            len_min = zartKeyToString(range.min, &key_str_min); // key gets allocated inside the function
+            len_max = zartKeyToString(range.max, &key_str_max); // key gets allocated inside the function
 
 
-            //if two rnages are 100.12 and 109.15 then the common string is 10
+            //if two ranges are 100.12 and 109.15 then the common string is 10
             int min = len_min >len_max ? len_min : len_max;
-            char *commonStr = zmalloc((min + 1) * sizeof(char));
+            sds commonStr = zmalloc((min + 1) * sizeof(char));
             int i=0;
             for(i=0; i<min; i++ ){
                 if( key_str_min[i] == key_str_max[i] )
@@ -1901,32 +1908,40 @@ void zremrangeGenericCommand(client *c, int rangetype) {
             }
             commonStr[i] = '\0';
 
-            art_node *node = art_search_node(zs->zart, commonStr, strlen(commonStr));
+
+//            serverLog(LL_NOTICE, "common string : %s", commonStr);
+            /*
+             * This unique piece of code handles the case when common String does not
+             * exist in the tree. In that case, it iteratively searches for a smaller common string and
+             * breaks out of the loop as it finds it .
+             * The easy secret sauce of implementing this without any mess of memory allocation,
+             * I just keep a string and keep on placing \0 until I find a string
+             */
+            sds loopStr = sdsdup(commonStr);
+            for( int j=strlen( commonStr ); j>0; j-- ){
+                loopStr[j] = '\0';
+                if(art_search(zs->zart, loopStr, strlen(loopStr)) != NULL ){
+                    break;
+                }
+            }
+//            serverLog(LL_NOTICE, "loop string : %s", loopStr);
+
+            art_node *node = art_search_node(zs->zart, loopStr, strlen(loopStr));
             if( node != NULL ){
                 art_tree t;
                 art_tree_init(&t);
                 t.root = node;
-                art_delete_by_range(t, key_str_min, key_str_max)
-
-
-
+                art_delete_by_range(t, key_str_min, key_str_max);
             }
             else{
-
+                art_delete_by_range(zs->zart, key_str_min, key_str_max);
             }
 
-
-
-
-
-            /*
-            for (int i = range.min; i <= range.max; i++)
-                deleted += zartRemove(zs->zart, i);     //TODO : not handling range remove of decimal numbers as it will require different approach
-
-            */
 
             zfree(key_str_min);
             zfree(key_str_max);
+            zfree(commonStr);
+            zfree(loopStr);
 
             break;
         case ZRANGE_LEX:
@@ -2678,7 +2693,17 @@ void zrangeGenericCommand(client *c, int reverse) {
                 addReplyDouble(c, ln->score);
             ln = reverse ? ln->backward : ln->level[0].forward;
         }
-    } else {
+    }
+    else if (zobj->encoding == OBJ_ENCODING_ART) {
+
+        /*
+         * Not doing it as it can be easily solved by ZRANK
+         *
+         */
+
+
+    }
+    else {
         serverPanic("Unknown sorted set encoding");
     }
 }

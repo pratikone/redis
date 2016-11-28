@@ -198,6 +198,7 @@ int art_iter(art_tree *t, art_callback cb, void **data);
 int art_iter_prefix(art_tree *t, const unsigned char *prefix, int prefix_len, art_callback cb, void *data);
 
 int iter_delete(void **data, const unsigned char* key, uint32_t key_len, void *val);
+int iter_delete_range(void **data, const unsigned char* key, uint32_t key_len, void *val);
 //function to be called on iter
 int iter_cb(void *data, const unsigned char* key, uint32_t key_len, void *val);
 

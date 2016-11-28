@@ -850,17 +850,7 @@ int art_delete_by_range(art_tree *t, char* min_range, char* max_range) {
     out[2] = max_range;
 
 
-    if(art_iter(t, iter_delete_range, out) == 1){
-        //success
-
-        return 0;
-    }
-    else{
-        serverLog(2, "Value not found");
-    }
-
-
-    return -1;
+    art_iter(t, iter_delete_range, out);
 
 }
 
