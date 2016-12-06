@@ -208,7 +208,7 @@ unsigned long zartRemove(art_tree *zart, double score) {
 
     if (zart != NULL) {
 
-        char *key_str = NULL;
+        sds key_str = NULL;
         int len = zartKeyToString(score, &key_str); // key gets allocated inside the function
 //        serverLog(LL_NOTICE, "score %s length  : %d", key_str, len);
         sds value = art_delete(zart, key_str, len);
@@ -216,7 +216,8 @@ unsigned long zartRemove(art_tree *zart, double score) {
 //        serverLog(LL_NOTICE, "deleting %s", value);
 
         sdsfree(value);
-        zfree(key_str); //key gets copied anyways
+        sdsfree(key_str);
+//        zfree(key_str); //key gets copied anyways
         return 1; //TODO : change it to count
     } else {
         serverLog(LL_NOTICE, "serverPanic");
@@ -232,14 +233,31 @@ size_t zartKeyToString( double key, sds *returningStr ){
 
     key_str_orig = zmalloc(100 * sizeof(char)); //used this trick to find number of digits in the number including decimal
 
-    sprintf(key_str_orig, "%f\0", key);
+    if( (int)round(key) == (int)key ){
+        sprintf(key_str_orig, "%d\0", key);
+        *returningStr = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
+        strcpy(*returningStr,key_str_orig);
 
-    *returningStr = zmalloc((strlen(key_str_orig) + 1) * sizeof(char));
+    }else{
 
+        sprintf(key_str_orig, "%f\0", key);
+        int i=0; //100.120000000\0
+        for(i=strlen(key_str_orig)-1;i>=0;i--){
+            if( key_str_orig[i]!='0' || key_str_orig[i]=='.' ){
+                break;
+            }
+        }
+        if( key_str_orig[i]=='.' ){
+            i=i-1;
+        }
+        key_str_orig[++i] = '\0';
 
-    sprintf(*returningStr, "%f\0", key);
+        *returningStr = zmalloc((i+ 1) * sizeof(char));
+        memcpy(*returningStr, key_str_orig, (i+1) * sizeof(char));
+    }
 
-//    serverLog(LL_NOTICE, "orig %s returning %s", key_str_orig, *returningStr);
+    serverLog(LL_NOTICE, "orig %f returning %s", key, *returningStr);
+
 
 
     zfree(key_str_orig);
@@ -1481,7 +1499,6 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
         }
     } else if (zobj->encoding == OBJ_ENCODING_ART) {
         zset *zs = zobj->ptr;
-        ele = sdsdup(ele);
 //        serverLog(LL_NOTICE, "value  : %s", ele);
         art_node *znode = zartInsert(zs->zart, score, ele);
 //        serverLog(LL_NOTICE, "working here");
